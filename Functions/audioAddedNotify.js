@@ -58,6 +58,13 @@ const data = {"value" : event.Records[0].s3.object.key}
 
         req.end();
 
+        const aws = require('aws-sdk');
+        const lambda = new aws.Lambda({ region: process.env.REGION });
+        const params = { FunctionName: 'onUpdateS3Object', InvocationType: 'RequestResponse', LogType: 'Tail', Payload: JSON.stringify(event)};
+        lambda.invoke(params, function(err, data) {
+            if (err) console.log(err, err.stack);
+            else     console.log(data);
+        });
 
 
     })
