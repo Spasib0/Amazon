@@ -34,7 +34,7 @@ exports.handler = async (event) => {
     var req = https.request(options, function(res) {
       console.log("code:" + res.statusCode)
 
-            if (res.statusCode == 200 || res.statusCode >= 300) {
+            if (res.statusCode < 200 || res.statusCode >= 300) {
               const params = { FunctionName: 'email', InvokeArgs: JSON.stringify({
                   emails: process.env.emails.split(','),
                   text: process.env.text + res.statusCode,
