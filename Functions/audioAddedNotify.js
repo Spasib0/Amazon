@@ -1,6 +1,7 @@
 const https = require('https')
 const http = require('http')
 const aws = require('aws-sdk');
+const lambda = new aws.Lambda({ region: process.env.EMAIL_REGION });
 
 exports.handler = async (event) => {
   const secret = process.env.SECRET;
@@ -26,14 +27,26 @@ exports.handler = async (event) => {
   
 
 
-const data = {"value" : event.Records[0].s3.object.key}
+  const data = {"value" : event.Records[0].s3.object.key}
 
   const promise = new Promise(function(resolve, reject) {
     
     var req = https.request(options, function(res) {
+      console.log("code:" + res.statusCode)
 
-            if (res.statusCode < 200 || res.statusCode >= 300) {
-                return reject(new Error('statusCode=' + res.statusCode));
+            if (res.statusCode == 200 || res.statusCode >= 300) {
+              const params = { FunctionName: 'email', InvokeArgs: JSON.stringify({
+                  emails: process.env.emails.split(','),
+                  text: process.env.text + res.statusCode,
+                  subject: process.env.subject 
+                  })};
+                  
+              lambda.invokeAsync(params,function(error, data) {
+                      console.log('email sent');
+                      reject(new Error('statusCode=' + res.statusCode))
+                      });
+              
+              return lambda;
             }
 
             var body = [];
@@ -65,8 +78,6 @@ const data = {"value" : event.Records[0].s3.object.key}
             if (err) console.log(err, err.stack);
             else     console.log(data);
         });
-
-
     })
   return promise
 };
