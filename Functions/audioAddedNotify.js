@@ -1,7 +1,9 @@
 const https = require('https')
 const http = require('http')
 const aws = require('aws-sdk');
-const lambda = new aws.Lambda({ region: process.env.EMAIL_REGION });
+const notificationLambda = new aws.Lambda({ region: process.env.NOTIFICATION_REGION });
+const syncLambda = new aws.Lambda({ region: process.env.SYNC_REGION });
+
 
 exports.handler = async (event) => {
   const secret = process.env.SECRET;
@@ -32,23 +34,20 @@ exports.handler = async (event) => {
   const promise = new Promise(function(resolve, reject) {
     
     var req = https.request(options, function(res) {
-      console.log("code:" + res.statusCode)
-
             if (res.statusCode < 200 || res.statusCode >= 300) {
-              const params = { FunctionName: 'email', InvokeArgs: JSON.stringify({
+
+              const params = { FunctionName: 'email', Payload: JSON.stringify({
                   emails: process.env.emails.split(','),
                   text: process.env.text + res.statusCode,
                   subject: process.env.subject 
                   })};
                   
-              lambda.invokeAsync(params,function(error, data) {
-                      console.log('email sent');
-                      reject(new Error('statusCode=' + res.statusCode))
+              notificationLambda.invoke(params, function(error, data) {
+                      console.log('Notification sent');
                       });
-              
-              return lambda;
+              return;
             }
-
+            
             var body = [];
             res.on('data', function(chunk) {
                 body.push(chunk);
@@ -72,9 +71,8 @@ exports.handler = async (event) => {
 
         req.end();
 
-        const lambda = new aws.Lambda({ region: process.env.REGION });
         const params = { FunctionName: 'onUpdateS3Object', InvocationType: 'RequestResponse', LogType: 'Tail', Payload: JSON.stringify(event)};
-        lambda.invoke(params, function(err, data) {
+        syncLambda.invoke(params, function(err, data) {
             if (err) console.log(err, err.stack);
             else     console.log(data);
         });
