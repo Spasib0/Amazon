@@ -1,6 +1,9 @@
 const https = require('https')
 const http = require('http')
 const aws = require('aws-sdk');
+const notificationLambda = new aws.Lambda({ region: process.env.NOTIFICATION_REGION });
+const syncLambda = new aws.Lambda({ region: process.env.SYNC_REGION });
+
 
 exports.handler = async (event) => {
   const secret = process.env.SECRET;
@@ -26,16 +29,25 @@ exports.handler = async (event) => {
   
 
 
-const data = {"value" : event.Records[0].s3.object.key}
+  const data = {"value" : event.Records[0].s3.object.key}
 
   const promise = new Promise(function(resolve, reject) {
     
     var req = https.request(options, function(res) {
-
             if (res.statusCode < 200 || res.statusCode >= 300) {
-                return reject(new Error('statusCode=' + res.statusCode));
-            }
 
+              const params = { FunctionName: 'email', Payload: JSON.stringify({
+                  emails: process.env.emails.split(','),
+                  text: process.env.text + res.statusCode,
+                  subject: process.env.subject 
+                  })};
+                  
+              notificationLambda.invoke(params, function(error, data) {
+                      console.log('Notification sent');
+                      });
+              return;
+            }
+            
             var body = [];
             res.on('data', function(chunk) {
                 body.push(chunk);
@@ -59,14 +71,11 @@ const data = {"value" : event.Records[0].s3.object.key}
 
         req.end();
 
-        const lambda = new aws.Lambda({ region: process.env.REGION });
         const params = { FunctionName: 'onUpdateS3Object', InvocationType: 'RequestResponse', LogType: 'Tail', Payload: JSON.stringify(event)};
-        lambda.invoke(params, function(err, data) {
+        syncLambda.invoke(params, function(err, data) {
             if (err) console.log(err, err.stack);
             else     console.log(data);
         });
-
-
     })
   return promise
 };
