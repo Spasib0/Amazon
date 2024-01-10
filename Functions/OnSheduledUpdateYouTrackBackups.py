@@ -47,12 +47,35 @@ def lambda_handler(event, context):
     
     key = f"{backup.year}/{backup.month}/{backup.day}{backup.month}{backup.year}.{backup.extension}"
 
-    print(key)
+    print("key", key)
     
     path = '/tmp/' + buketName
     
     with http.request('GET', os.environ['YT_API_URL']+backupLink, preload_content=False) as r, open(path, 'wb') as out_file:       
-        shutil.copyfileobj(r, out_file)
+       shutil.copyfileobj(r, out_file)
 
     yt_bucket_obj = s3.upload_file(path, os.environ['YT_BUCKET'], key )
     
+    print("ytobj", yt_bucket_obj)
+    
+    SesClient = boto3.client('ses', region_name='eu-west-1')
+    response = SesClient.send_email(
+        Destination={
+            'ToAddresses': os.environ['YT_EMAILS'].split(',')
+        },
+        Message={
+            'Body': {
+                'Text': {
+                    'Charset': 'UTF-8',
+                    'Data': 'Youtrack backup - https://s3.console.aws.amazon.com/s3/object/youtrackbackups?region=eu-central-1&prefix=' + key,
+                }
+            },
+            'Subject': {
+                'Charset': 'UTF-8',
+                'Data': 'Youtrack buckup complite',
+            },
+        },
+    Source= os.environ['YT_EMAIL_SOURCE']
+    )
+    
+    print(response)
